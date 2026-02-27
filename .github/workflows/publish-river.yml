@@ -1,0 +1,54 @@
+name: Publish River of CPAN Data
+
+on:
+  schedule:
+    - cron: '29 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions: {}
+    container:
+      image: perldocker/perl-tester:5.42
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Checkout MetaCPAN-Client
+        uses: actions/checkout@v6
+        with:
+          repository: metacpan/MetaCPAN-Client
+          ref: oalders/resultset
+          path: MetaCPAN-Client
+
+      - name: Install dependencies
+        run: cpm install -g --cpanfile cpanfile
+
+      - name: Generate river data
+        run: perl bin/river.pl > river.json
+
+      - name: Prepare Pages directory
+        run: |
+          mkdir -p .pages
+          gzip -k river.json
+          cp river.json .pages/
+          cp river.json.gz .pages/
+
+      - name: Upload artifact for Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .pages/
+
+  deploy:
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
