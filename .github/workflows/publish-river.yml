@@ -14,12 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Checkout MetaCPAN-Client
-        uses: actions/checkout@v6
+      - name: Convert README to index.html
+        uses: davorg/readme-to-index@v1
         with:
-          repository: metacpan/MetaCPAN-Client
-          ref: oalders/resultset
-          path: MetaCPAN-Client
+          output: .pages/index.html
 
       - name: Install dependencies
         run: cpm install -g --cpanfile cpanfile
