@@ -12,7 +12,7 @@ jobs:
     container:
       image: perldocker/perl-tester:5.42
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Convert README to index.html
         uses: davorg/readme-to-index@v1
