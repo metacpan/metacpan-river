@@ -24,17 +24,19 @@ my $mcpan = MetaCPAN::Client->new;
 
 sub next_with_retry {
     my $rs = shift;
+    my $last;
     for my $attempt ( 1 .. 10 ) {
         try {
             return $rs->next;
         }
         catch ($e) {
             chomp $e;
+            $last = $e;
             say STDERR "  retrying after: $e";
             sleep $attempt;
         }
     }
-    die "giving up after 10 attempts\n";
+    die "giving up after 10 attempts: $last\n";
 }
 
 say STDERR "Phase 1: scrolling latest releases ...";
@@ -99,8 +101,8 @@ while ( my $release = next_with_retry($latest) ) {
 say STDERR "  releases scanned: $count (done)";
 say STDERR "  modules mapped: " . scalar( keys %module_to_dist );
 
-die "scroll ended early: got $count of ${\ $latest->total }\n"
-    if $count < $latest->total;
+my $total = $latest->total;
+die "scroll ended early: got $count of $total\n" if $count < $total;
 
 die "ERROR: Only $count releases found (expected >40000). "
     . "MetaCPAN API may be having issues.\n"
