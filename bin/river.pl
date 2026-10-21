@@ -32,8 +32,8 @@ sub next_with_retry {
         catch ($e) {
             chomp $e;
             $last = $e;
-            say STDERR "  retrying after: $e";
-            sleep $attempt;
+            say STDERR "  retrying after (attempt $attempt/10): $e";
+            sleep $attempt if $attempt < 10;
         }
     }
     die "giving up after 10 attempts: $last\n";
