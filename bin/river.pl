@@ -3,8 +3,7 @@
 # Compute the "River of CPAN" position for every distribution.
 # See https://www.neilb.org/2015/04/20/river-of-cpan.html
 
-use v5.12;
-use warnings;
+use v5.40;
 
 # Remove this once https://github.com/metacpan/MetaCPAN-Client/pull/134 has
 # been released.
@@ -15,6 +14,30 @@ use MetaCPAN::Client  ();
 use Ref::Util         qw( is_plain_arrayref is_plain_hashref );
 
 my $mcpan = MetaCPAN::Client->new;
+
+# The API intermittently fails scroll requests (see
+# https://github.com/metacpan/metacpan-api/issues/1506). When fetching the
+# next batch fails, the scroller's state is unchanged, so calling next()
+# again simply resends the same request. If a retry ever skipped a batch, the
+# scroll would end short of its total, which the check below turns into a
+# hard failure rather than incomplete output.
+
+sub next_with_retry {
+    my $rs = shift;
+    my $last;
+    for my $attempt ( 1 .. 10 ) {
+        try {
+            return $rs->next;
+        }
+        catch ($e) {
+            chomp $e;
+            $last = $e;
+            say STDERR "  attempt $attempt/10 failed: $e";
+            sleep $attempt if $attempt < 10;
+        }
+    }
+    die "giving up after 10 attempts: $last\n";
+}
 
 say STDERR "Phase 1: scrolling latest releases ...";
 
@@ -32,7 +55,10 @@ my %module_to_dist;  # module_name => distribution
 my @all_dists;       # all distribution names seen
 
 my $count = 0;
-while ( my $release = $latest->next ) {
+while ( my $release = next_with_retry($latest) ) {
+    $count++;
+    say STDERR "  releases scanned: $count" if $count % 5000 == 0;
+
     my $dist = $release->distribution;
     next unless defined $dist;
 
@@ -70,13 +96,13 @@ while ( my $release = $latest->next ) {
         }
         $dist_deps{$dist} = \@filtered if @filtered;
     }
-
-    $count++;
-    say STDERR "  releases scanned: $count" if $count % 5000 == 0;
 }
 
 say STDERR "  releases scanned: $count (done)";
 say STDERR "  modules mapped: " . scalar( keys %module_to_dist );
+
+my $total = $latest->total;
+die "scroll ended early: got $count of $total\n" if $count < $total;
 
 die "ERROR: Only $count releases found (expected >40000). "
     . "MetaCPAN API may be having issues.\n"
